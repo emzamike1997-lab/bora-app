@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+javas_ai.db
+*.db
+.DS_Store
