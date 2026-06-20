@@ -59,6 +59,11 @@ def get_lease_prompt(monthly_rent=0, deposit_amount=0, lease_years=1):
     - CPA section 14 violations (cancellation rights)
     - Unreasonable entry without notice (violating privacy)
     - Landlord overreach and asymmetric maintenance liabilities.
+    - LATE PAYMENT PENALTIES: Check for any late payment penalty percentage per day, per week, or per month. Flag as excessive if any penalty exceeds 2% per month. Flag any percentage per DAY as a critical RED flag. Flag uncapped penalties as critical violations.
+    - AUTOMATIC RENEWAL CLAUSES: Check for automatic renewal provisions. Flag if the notice period exceeds 1 month, or if renewal is automatic with no opt-out option clearly stated. Check for CPA section 14 compliance.
+    - RATES AND TAXES: Check who is responsible for municipal rates and taxes. Flag if the tenant is required to pay rates and taxes, as this is typically the landlord's responsibility.
+    - DEPOSIT INTEREST: Explicitly check and flag if interest on the deposit goes to the landlord (Rental Housing Act requires interest to accrue to the tenant, not the landlord).
+    - ESCALATION CLAUSE: Check annual rental escalation. Flag if escalation exceeds CPI, is not linked to a clear index, or is automatic with no cap.
 
     FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
