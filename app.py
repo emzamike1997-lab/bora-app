@@ -261,7 +261,7 @@ with p1:
     st.markdown("""
         <div class="price-card">
             <h4>Pay Per Document</h4>
-            <div class="price-amount">R500</div>
+            <div class="price-amount">$16</div>
             <p>Single analysis</p>
             <p>Full PDF report</p>
             <p>No watermark</p>
@@ -274,7 +274,7 @@ with p2:
         <div class="price-card featured">
             <div class="price-badge">Most Popular</div>
             <h4>Monthly</h4>
-            <div class="price-amount">R299<span style='font-size:14px;font-weight:400'>/mo</span></div>
+            <div class="price-amount">$16<span style='font-size:14px;font-weight:400'>/mo</span></div>
             <p>Unlimited analyses</p>
             <p>Full PDF reports</p>
             <p>Priority processing</p>
@@ -286,7 +286,7 @@ with p3:
     st.markdown("""
         <div class="price-card">
             <h4>Business</h4>
-            <div class="price-amount">R1499<span style='font-size:14px;font-weight:400'>/mo</span></div>
+            <div class="price-amount">$80<span style='font-size:14px;font-weight:400'>/mo</span></div>
             <p>Everything in Monthly</p>
             <p>Up to 5 users</p>
             <p>API access</p>
