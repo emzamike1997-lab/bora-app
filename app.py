@@ -185,6 +185,11 @@ with col_title:
 
 st.write("---")
 
+# ── Developer Mode Indicator ──────────────────────────────────────────────────
+last_email = st.session_state.get("last_email", "")
+if last_email and "+dev" in last_email:
+    st.info(f"🛠️ Developer Mode Active ({last_email}) - Free tier limits bypassed")
+
 # ── 7. Analysis type cards ────────────────────────────────────────────────────
 st.markdown("### Select Analysis Type")
 
