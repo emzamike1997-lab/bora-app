@@ -15,6 +15,59 @@ def get_contract_risk_prompt():
     
     Identify unbalanced, dangerous, or unfair clauses, specifically looking out for uncapped penalties and asymmetrical rights, referencing South African common law and CPA where applicable.
 
+    MANDATORY CHECKS FOR EVERY DOCUMENT TYPE:
+    A) PENALTY CLAUSE CHECKS
+       - Flag ANY penalty percentage per day as CRITICAL RED regardless of amount.
+       - Flag uncapped penalties as CRITICAL RED.
+       - Flag penalties exceeding 2% per month as AMBER.
+       - Always state the exact percentage found.
+       - Always calculate what the penalty would be in rand after 7 days and 30 days to show real impact (using illustrative contract values if context is missing).
+    B) DEPOSIT CHECKS
+       - Calculate maximum legal deposit: monthly rent * 2 (if applicable).
+       - If deposit exceeds this, flag as CRITICAL RED and state the exact overage amount in rand, citing RHA 5(3)(e) specifically.
+       - Check if an interest clause exists. Flag if interest goes to landlord as CRITICAL RED citing RHA (interest must accrue to tenant).
+    C) NOTICE PERIOD CHECKS
+       - For employment contracts:
+         * Probation notice: minimum 1 week BCEA.
+         * Year 1 notice: minimum 1 week BCEA.
+         * Year 1-5 notice: minimum 2 weeks BCEA.
+         * Over 5 years notice: minimum 4 weeks BCEA.
+         * Flag any shorter notice periods as CRITICAL RED.
+         * Calculate exact CCMA exposure in rand (illustrative amount based on salary/duration).
+       - For leases:
+         * Entry notice: minimum 24 hours. Flag immediate entry as CRITICAL RED.
+         * Termination notice: reasonable period.
+    D) WORKING HOURS CHECKS
+       - BCEA maximum: 45 ordinary hours/week. Flag anything over 45 as CRITICAL RED.
+       - Check overtime compensation clauses. Flag unpaid overtime as CRITICAL RED.
+       - Calculate exact overtime owed per month if working hours are exceeded.
+    E) RESTRAINT OF TRADE CHECKS
+       - Flag any restraint over 2 years as RED.
+       - Flag national geographic scope as RED.
+       - Flag entire industry restrictions as RED.
+       - Calculate estimated financial impact of the restraint on the employee/business.
+    F) AUTOMATIC RENEWAL CHECKS
+       - Flag automatic renewal without clear opt-out as AMBER.
+       - Flag notice period over 1 month to avoid renewal as AMBER.
+       - Cite CPA section 14 specifically.
+       - Flag automatic price increases linked to renewal as RED.
+    G) UNILATERAL VARIATION CHECKS
+       - Flag any clause allowing one party to change terms without consent.
+       - Flag employer changing job description without notice as RED.
+       - Flag landlord changing rules unilaterally as RED.
+    H) JURISDICTION CHECKS
+       - Flag any clause ousting Labour Court jurisdiction as CRITICAL RED.
+       - Flag CCMA rights being waived as CRITICAL RED.
+       - Flag arbitration clauses that remove court access as RED.
+    I) INTELLECTUAL PROPERTY CHECKS
+       - Flag IP ownership of work done outside hours with own resources as CRITICAL RED.
+       - Flag unlimited IP assignment as RED.
+       - Flag moral rights waiver as AMBER.
+    J) DEDUCTION CHECKS
+       - Flag unilateral deductions without consent as CRITICAL RED.
+       - Flag open-ended deduction authority as CRITICAL RED.
+       - Cite BCEA section 34 specifically.
+
     FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
     OVERALL RISK RATING
@@ -59,11 +112,59 @@ def get_lease_prompt(monthly_rent=0, deposit_amount=0, lease_years=1):
     - CPA section 14 violations (cancellation rights)
     - Unreasonable entry without notice (violating privacy)
     - Landlord overreach and asymmetric maintenance liabilities.
-    - LATE PAYMENT PENALTIES: Check for any late payment penalty percentage per day, per week, or per month. Flag as excessive if any penalty exceeds 2% per month. Flag any percentage per DAY as a critical RED flag. Flag uncapped penalties as critical violations.
-    - AUTOMATIC RENEWAL CLAUSES: Check for automatic renewal provisions. Flag if the notice period exceeds 1 month, or if renewal is automatic with no opt-out option clearly stated. Check for CPA section 14 compliance.
-    - RATES AND TAXES: Check who is responsible for municipal rates and taxes. Flag if the tenant is required to pay rates and taxes, as this is typically the landlord's responsibility.
-    - DEPOSIT INTEREST: Explicitly check and flag if interest on the deposit goes to the landlord (Rental Housing Act requires interest to accrue to the tenant, not the landlord).
-    - ESCALATION CLAUSE: Check annual rental escalation. Flag if escalation exceeds CPI, is not linked to a clear index, or is automatic with no cap.
+
+    MANDATORY CHECKS FOR EVERY DOCUMENT TYPE:
+    A) PENALTY CLAUSE CHECKS
+       - Flag ANY penalty percentage per day as CRITICAL RED regardless of amount.
+       - Flag uncapped penalties as CRITICAL RED.
+       - Flag penalties exceeding 2% per month as AMBER.
+       - Always state the exact percentage found.
+       - Always calculate what the penalty would be in rand after 7 days and 30 days based on rent of R{monthly_rent} to show real impact.
+    B) DEPOSIT CHECKS
+       - Calculate maximum legal deposit: monthly rent R{monthly_rent} * 2 = R{monthly_rent * 2}.
+       - If the actual deposit of R{deposit_amount} exceeds this, flag as CRITICAL RED and state the exact overage amount in rand (R{max(0, deposit_amount - (monthly_rent * 2))}), citing RHA 5(3)(e) specifically.
+       - Check if an interest clause exists. Flag if interest goes to landlord as CRITICAL RED citing RHA (interest must accrue to tenant).
+    C) NOTICE PERIOD CHECKS
+       - For employment contracts:
+         * Probation notice: minimum 1 week BCEA.
+         * Year 1 notice: minimum 1 week BCEA.
+         * Year 1-5 notice: minimum 2 weeks BCEA.
+         * Over 5 years notice: minimum 4 weeks BCEA.
+         * Flag any shorter notice periods as CRITICAL RED.
+         * Calculate exact CCMA exposure in rand.
+       - For leases:
+         * Entry notice: minimum 24 hours. Flag immediate entry as CRITICAL RED.
+         * Termination notice: reasonable period.
+    D) WORKING HOURS CHECKS
+       - BCEA maximum: 45 ordinary hours/week. Flag anything over 45 as CRITICAL RED.
+       - Check overtime compensation clauses. Flag unpaid overtime as CRITICAL RED.
+       - Calculate exact overtime owed per month if working hours are exceeded.
+    E) RESTRAINT OF TRADE CHECKS
+       - Flag any restraint over 2 years as RED.
+       - Flag national geographic scope as RED.
+       - Flag entire industry restrictions as RED.
+       - Calculate estimated financial impact of the restraint.
+    F) AUTOMATIC RENEWAL CHECKS
+       - Flag automatic renewal without clear opt-out as AMBER.
+       - Flag notice period over 1 month to avoid renewal as AMBER.
+       - Cite CPA section 14 specifically.
+       - Flag automatic price increases linked to renewal as RED.
+    G) UNILATERAL VARIATION CHECKS
+       - Flag any clause allowing one party to change terms without consent.
+       - Flag employer changing job description without notice as RED.
+       - Flag landlord changing rules unilaterally as RED.
+    H) JURISDICTION CHECKS
+       - Flag any clause ousting Labour Court jurisdiction as CRITICAL RED.
+       - Flag CCMA rights being waived as CRITICAL RED.
+       - Flag arbitration clauses that remove court access as RED.
+    I) INTELLECTUAL PROPERTY CHECKS
+       - Flag IP ownership of work done outside hours with own resources as CRITICAL RED.
+       - Flag unlimited IP assignment as RED.
+       - Flag moral rights waiver as AMBER.
+    J) DEDUCTION CHECKS
+       - Flag unilateral deductions without consent as CRITICAL RED.
+       - Flag open-ended deduction authority as CRITICAL RED.
+       - Cite BCEA section 34 specifically.
 
     FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
@@ -108,6 +209,59 @@ def get_employment_prompt():
     Verify if the 8 procedural fairness steps for disciplinary action are properly addressed.
     Where applicable, cite real SA Labour Court cases (e.g., Sidumo, NUMSA v Bader Bop, Edcon v Pillemer). Do NOT fabricate cases.
 
+    MANDATORY CHECKS FOR EVERY DOCUMENT TYPE:
+    A) PENALTY CLAUSE CHECKS
+       - Flag ANY penalty percentage per day as CRITICAL RED regardless of amount.
+       - Flag uncapped penalties as CRITICAL RED.
+       - Flag penalties exceeding 2% per month as AMBER.
+       - Always state the exact percentage found.
+       - Always calculate what the penalty would be in rand after 7 days and 30 days to show real impact (using contract salary details).
+    B) DEPOSIT CHECKS
+       - Calculate maximum legal deposit: monthly rent * 2 (if applicable).
+       - If deposit exceeds this, flag as CRITICAL RED and state the exact overage amount in rand, citing RHA 5(3)(e) specifically.
+       - Check if an interest clause exists. Flag if interest goes to landlord as CRITICAL RED citing RHA (interest must accrue to tenant).
+    C) NOTICE PERIOD CHECKS
+       - For employment contracts:
+         * Probation notice: minimum 1 week BCEA.
+         * Year 1 notice: minimum 1 week BCEA.
+         * Year 1-5 notice: minimum 2 weeks BCEA.
+         * Over 5 years notice: minimum 4 weeks BCEA.
+         * Flag any shorter notice periods as CRITICAL RED.
+         * Calculate exact CCMA exposure in rand (calculate total exposure based on potential unfair dismissal or breach damages, e.g. 12-24 months salary).
+       - For leases:
+         * Entry notice: minimum 24 hours. Flag immediate entry as CRITICAL RED.
+         * Termination notice: reasonable period.
+    D) WORKING HOURS CHECKS
+       - BCEA maximum: 45 ordinary hours/week. Flag anything over 45 as CRITICAL RED.
+       - Check overtime compensation clauses. Flag unpaid overtime as CRITICAL RED.
+       - Calculate exact overtime owed per month if working hours are exceeded.
+    E) RESTRAINT OF TRADE CHECKS
+       - Flag any restraint over 2 years as RED.
+       - Flag national geographic scope as RED.
+       - Flag entire industry restrictions as RED.
+       - Calculate estimated financial impact of the restraint on the employee (e.g. lost earnings during restraint period).
+    F) AUTOMATIC RENEWAL CHECKS
+       - Flag automatic renewal without clear opt-out as AMBER.
+       - Flag notice period over 1 month to avoid renewal as AMBER.
+       - Cite CPA section 14 specifically.
+       - Flag automatic price increases linked to renewal as RED.
+    G) UNILATERAL VARIATION CHECKS
+       - Flag any clause allowing one party to change terms without consent.
+       - Flag employer changing job description without notice as RED.
+       - Flag landlord changing rules unilaterally as RED.
+    H) JURISDICTION CHECKS
+       - Flag any clause ousting Labour Court jurisdiction as CRITICAL RED.
+       - Flag CCMA rights being waived as CRITICAL RED.
+       - Flag arbitration clauses that remove court access as RED.
+    I) INTELLECTUAL PROPERTY CHECKS
+       - Flag IP ownership of work done outside hours with own resources as CRITICAL RED.
+       - Flag unlimited IP assignment as RED.
+       - Flag moral rights waiver as AMBER.
+    J) DEDUCTION CHECKS
+       - Flag unilateral deductions without consent as CRITICAL RED.
+       - Flag open-ended deduction authority as CRITICAL RED.
+       - Cite BCEA section 34 specifically.
+
     FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
     OVERALL RISK RATING
@@ -145,7 +299,60 @@ def get_general_scan_prompt():
     STANDARD — do NOT flag as risks:
     - Mutual exclusion of indirect or consequential damages where BOTH parties are excluded equally. NEVER flag as CRITICAL, HIGH, or MEDIUM.
     - Symmetric liability caps where both parties are capped at the SAME amount. NEVER flag as CRITICAL.
-    
+
+    MANDATORY CHECKS FOR EVERY DOCUMENT TYPE:
+    A) PENALTY CLAUSE CHECKS
+       - Flag ANY penalty percentage per day as CRITICAL RED regardless of amount.
+       - Flag uncapped penalties as CRITICAL RED.
+       - Flag penalties exceeding 2% per month as AMBER.
+       - Always state the exact percentage found.
+       - Always calculate what the penalty would be in rand after 7 days and 30 days to show real impact (using illustrative contract values).
+    B) DEPOSIT CHECKS
+       - Calculate maximum legal deposit: monthly rent * 2 (if applicable).
+       - If deposit exceeds this, flag as CRITICAL RED and state the exact overage amount in rand, citing RHA 5(3)(e) specifically.
+       - Check if an interest clause exists. Flag if interest goes to landlord as CRITICAL RED citing RHA.
+    C) NOTICE PERIOD CHECKS
+       - For employment contracts:
+         * Probation notice: minimum 1 week BCEA.
+         * Year 1 notice: minimum 1 week BCEA.
+         * Year 1-5 notice: minimum 2 weeks BCEA.
+         * Over 5 years notice: minimum 4 weeks BCEA.
+         * Flag any shorter notice periods as CRITICAL RED.
+         * Calculate exact CCMA exposure in rand.
+       - For leases:
+         * Entry notice: minimum 24 hours. Flag immediate entry as CRITICAL RED.
+         * Termination notice: reasonable period.
+    D) WORKING HOURS CHECKS
+       - BCEA maximum: 45 ordinary hours/week. Flag anything over 45 as CRITICAL RED.
+       - Check overtime compensation clauses. Flag unpaid overtime as CRITICAL RED.
+       - Calculate exact overtime owed per month if working hours are exceeded.
+    E) RESTRAINT OF TRADE CHECKS
+       - Flag any restraint over 2 years as RED.
+       - Flag national geographic scope as RED.
+       - Flag entire industry restrictions as RED.
+       - Calculate estimated financial impact of the restraint.
+    F) AUTOMATIC RENEWAL CHECKS
+       - Flag automatic renewal without clear opt-out as AMBER.
+       - Flag notice period over 1 month to avoid renewal as AMBER.
+       - Cite CPA section 14 specifically.
+       - Flag automatic price increases linked to renewal as RED.
+    G) UNILATERAL VARIATION CHECKS
+       - Flag any clause allowing one party to change terms without consent.
+       - Flag employer changing job description without notice as RED.
+       - Flag landlord changing rules unilaterally as RED.
+    H) JURISDICTION CHECKS
+       - Flag any clause ousting Labour Court jurisdiction as CRITICAL RED.
+       - Flag CCMA rights being waived as CRITICAL RED.
+       - Flag arbitration clauses that remove court access as RED.
+    I) INTELLECTUAL PROPERTY CHECKS
+       - Flag IP ownership of work done outside hours with own resources as CRITICAL RED.
+       - Flag unlimited IP assignment as RED.
+       - Flag moral rights waiver as AMBER.
+    J) DEDUCTION CHECKS
+       - Flag unilateral deductions without consent as CRITICAL RED.
+       - Flag open-ended deduction authority as CRITICAL RED.
+       - Cite BCEA section 34 specifically.
+
     FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
     OVERALL RISK RATING

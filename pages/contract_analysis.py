@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import stripe
 from modules.database import can_analyze, consume_analysis
-from modules.analyzer import run_analysis, extract_text_from_file
+from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_contract_risk_prompt
 from modules.report import generate_pdf_report, send_report_email
 
@@ -46,8 +46,21 @@ with st.container(border=True):
     email = st.text_input("Enter your email address (Required)", value=st.session_state.get("last_email", ""))
     if email and "+dev" in email:
         st.info("🛠️ Developer Mode Active - Free tier limit bypassed")
+        
     uploaded_file = st.file_uploader("Upload Contract", type=["pdf", "docx", "txt"])
+    
+    if uploaded_file:
+        stats = get_document_stats(uploaded_file)
+        st.markdown(f"""
+        📊 **Document Statistics:**
+        - **Estimated Pages:** {stats['pages']}
+        - **Word Count Estimate:** {stats['words']:,} words
+        - **Recommended Analysis Depth:** {stats['recommended_depth']}
+        """)
+        
     depth = st.selectbox("Analysis Depth", ["Quick Scan (30 seconds)", "Standard Analysis (60 seconds)", "Deep Review (2-3 minutes)"], index=1)
+
+    st.info("💡 Tip: Upload the complete document including all schedules and annexures for the most accurate analysis.")
 
     if st.button("ANALYSE DOCUMENT"):
         if not email:
@@ -82,19 +95,36 @@ with st.container(border=True):
                 except Exception as e:
                     st.error(f"Payment gateway error: {str(e)}")
             else:
-                with st.spinner("Extracting text and running analysis..."):
-                    text = extract_text_from_file(uploaded_file)
-                    if not text:
-                        st.error("Could not extract text from file.")
-                    else:
-                        prompt = get_contract_risk_prompt()
-                        results = run_analysis(text, prompt, depth)
-                        
-                        st.session_state.last_results = results
-                        st.session_state.last_email = email
-                        st.session_state.last_type = "Contract Risk"
-                        consume_analysis(email)
-                        st.rerun()
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                status_text.write("📄 Reading document...")
+                progress_bar.progress(20)
+                text = extract_text_from_file(uploaded_file)
+                
+                if not text:
+                    st.error("Could not extract text from file.")
+                else:
+                    status_text.write("🔍 Identifying clauses...")
+                    progress_bar.progress(40)
+                    
+                    status_text.write("⚖️ Checking against SA law...")
+                    progress_bar.progress(60)
+                    
+                    prompt = get_contract_risk_prompt()
+                    results = run_analysis(text, prompt, depth, document_type="Contract Risk Analysis")
+                    
+                    status_text.write("📊 Calculating risk scores...")
+                    progress_bar.progress(80)
+                    
+                    status_text.write("📝 Generating report...")
+                    progress_bar.progress(100)
+                    
+                    st.session_state.last_results = results
+                    st.session_state.last_email = email
+                    st.session_state.last_type = "Contract Risk"
+                    consume_analysis(email)
+                    st.rerun()
 
 # Display Results if available
 if "last_results" in st.session_state and st.session_state.last_type == "Contract Risk":
@@ -107,6 +137,27 @@ if "last_results" in st.session_state and st.session_state.last_type == "Contrac
     elif any(err in results for err in ["Chunk processing failed:", "Rate limit exceeded", "Request too large"]):
         st.warning("⚡ Processing large document in sections. Results may be partial. Try Quick Scan for faster results.")
     else:
+        # Results Summary UI
+        scorecard = parse_scorecard(results)
+        
+        # 1. Coloured summary box
+        if scorecard["overall"] == "RED":
+            st.error("🔴 HIGH RISK DOCUMENT — Do not sign without legal review and negotiation.")
+        elif scorecard["overall"] == "AMBER":
+            st.warning("🟡 MODERATE RISK DOCUMENT — Review flagged clauses before signing.")
+        else:
+            st.success("🟢 LOW RISK DOCUMENT — This document appears reasonable. Standard legal review recommended.")
+            
+        # 2. Metric row with 3 columns
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Critical (Red)", scorecard["critical"])
+        col_m2.metric("Moderate (Amber)", scorecard["moderate"])
+        col_m3.metric("Low (Green)", scorecard["low"])
+        
+        # 3. Recommended Action badge
+        st.markdown(f"**Recommended Action:** `{scorecard['recommended']}`")
+        st.write("---")
+        
         # Custom rendering for the results
         for line in results.split("\n"):
             if "[RED" in line or "[AMBER" in line or "[GREEN" in line:
