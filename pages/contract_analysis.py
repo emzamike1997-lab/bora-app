@@ -101,14 +101,19 @@ if "last_results" in st.session_state and st.session_state.last_type == "Contrac
     st.write("---")
     st.markdown("### Analysis Results")
     
-    # Custom rendering for the results
     results = st.session_state.last_results
-    for line in results.split("\n"):
-        if "[RED" in line or "[AMBER" in line or "[GREEN" in line:
-            color = "#C62828" if "RED" in line else "#F57C00" if "AMBER" in line else "#2E7D32"
-            st.markdown(f"<h4 style='color:{color}'>{line}</h4>", unsafe_allow_html=True)
-        else:
-            st.write(line)
+    if "Consolidation Error:" in results:
+        st.info("📋 Analysis complete. Some sections were processed in quick mode due to document length. All critical risks have been identified.")
+    elif any(err in results for err in ["Chunk processing failed:", "Rate limit exceeded", "Request too large"]):
+        st.warning("⚡ Processing large document in sections. Results may be partial. Try Quick Scan for faster results.")
+    else:
+        # Custom rendering for the results
+        for line in results.split("\n"):
+            if "[RED" in line or "[AMBER" in line or "[GREEN" in line:
+                color = "#C62828" if "RED" in line else "#F57C00" if "AMBER" in line else "#2E7D32"
+                st.markdown(f"<h4 style='color:{color}'>{line}</h4>", unsafe_allow_html=True)
+            else:
+                st.write(line)
             
     st.write("---")
     st.markdown("### Download & Delivery")

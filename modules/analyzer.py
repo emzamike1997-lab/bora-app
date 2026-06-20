@@ -1,6 +1,7 @@
 import os
 import re
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from PyPDF2 import PdfReader
 from docx import Document
@@ -45,7 +46,7 @@ def chunk_text(text, chunk_size=2000, overlap=200):
     return chunks
 
 def process_chunk(chunk, instruction):
-    """Processes a single text chunk using Groq Llama 3.1."""
+    """Processes a single text chunk using Groq Llama 3.3."""
     try:
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
@@ -53,7 +54,7 @@ def process_chunk(chunk, instruction):
             
         client = Groq(api_key=api_key)
         res = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": f"{instruction}\n\nCONTENT:\n{chunk}"}],
             temperature=0.2
         )
@@ -109,7 +110,7 @@ def run_analysis(text, prompt, depth="Standard Analysis"):
     if depth == "Quick Scan (30 seconds)":
         chunk_size = 4000
         overlap = 100
-        model = "llama-3.1-8b-instant"
+        model = "llama-3.3-70b-versatile"
     elif depth == "Deep Review (2-3 minutes)":
         chunk_size = 1500
         overlap = 300
@@ -117,14 +118,17 @@ def run_analysis(text, prompt, depth="Standard Analysis"):
     else: # Standard
         chunk_size = 2000
         overlap = 200
-        model = "llama-3.1-8b-instant"
+        model = "llama-3.3-70b-versatile"
 
     chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
     partial_results = []
 
-    # Parallel processing of chunks
+    # Parallel processing of chunks with a 2-second delay between calls to avoid rate limits
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(process_chunk, chunk, prompt) for chunk in chunks]
+        futures = []
+        for chunk in chunks:
+            futures.append(executor.submit(process_chunk, chunk, prompt))
+            time.sleep(2)
         for future in futures:
             partial_results.append(future.result())
             
