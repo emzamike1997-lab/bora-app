@@ -5,6 +5,7 @@ from modules.database import can_analyze, consume_analysis
 from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_contract_risk_prompt
 from modules.report import generate_pdf_report, send_report_email
+from modules.results_display import display_formatted_results
 
 st.set_page_config(page_title="Contract Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
 
@@ -160,8 +161,8 @@ if "last_results" in st.session_state and st.session_state.last_type == "Contrac
     st.markdown(f"**Recommended Action:** `{scorecard['recommended']}`")
     st.write("---")
     
-    # 4. Full results text
-    st.markdown(results, unsafe_allow_html=True)
+    # 4. Formatted results display
+    display_formatted_results(results)
             
     st.write("---")
     st.markdown("### Download & Delivery")

@@ -5,6 +5,7 @@ from modules.database import can_analyze, consume_analysis
 from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_lease_prompt
 from modules.report import generate_pdf_report, send_report_email
+from modules.results_display import display_formatted_results
 
 st.set_page_config(page_title="Lease Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
 
@@ -131,40 +132,41 @@ with st.container(border=True):
                     consume_analysis(email)
                     st.rerun()
 
-# Display Results if available
 if "last_results" in st.session_state and st.session_state.last_type == "Lease Analysis":
     st.write("---")
     st.markdown("### Analysis Results")
     
     results = st.session_state.last_results
+    
+    # Show informational banners for partial results
     if "Consolidation Error:" in results:
         st.info("📋 Analysis complete. Some sections were processed in quick mode due to document length. All critical risks have been identified.")
     elif any(err in results for err in ["Chunk processing failed:", "Rate limit exceeded", "Request too large"]):
         st.warning("⚡ Processing large document in sections. Results may be partial. Try Quick Scan for faster results.")
+    
+    # Always show scorecard and results
+    scorecard = parse_scorecard(results)
+    
+    # 1. Coloured summary box
+    if scorecard["overall"] == "RED":
+        st.error("🔴 HIGH RISK DOCUMENT — Do not sign without legal review and negotiation.")
+    elif scorecard["overall"] == "AMBER":
+        st.warning("🟡 MODERATE RISK DOCUMENT — Review flagged clauses before signing.")
     else:
-        # Results Summary UI
-        scorecard = parse_scorecard(results)
+        st.success("🟢 LOW RISK DOCUMENT — This document appears reasonable. Standard legal review recommended.")
         
-        # 1. Coloured summary box
-        if scorecard["overall"] == "RED":
-            st.error("🔴 HIGH RISK DOCUMENT — Do not sign without legal review and negotiation.")
-        elif scorecard["overall"] == "AMBER":
-            st.warning("🟡 MODERATE RISK DOCUMENT — Review flagged clauses before signing.")
-        else:
-            st.success("🟢 LOW RISK DOCUMENT — This document appears reasonable. Standard legal review recommended.")
-            
-        # 2. Metric row with 3 columns
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("Critical (Red)", scorecard["critical"])
-        col_m2.metric("Moderate (Amber)", scorecard["moderate"])
-        col_m3.metric("Low (Green)", scorecard["low"])
-        
-        # 3. Recommended Action badge
-        st.markdown(f"**Recommended Action:** `{scorecard['recommended']}`")
-        st.write("---")
-        
-        # 4. Full results text
-        st.markdown(results, unsafe_allow_html=True)
+    # 2. Metric row with 3 columns
+    col_m1, col_m2, col_m3 = st.columns(3)
+    col_m1.metric("🔴 Critical Risks", scorecard["critical"])
+    col_m2.metric("🟡 Moderate Risks", scorecard["moderate"])
+    col_m3.metric("🟢 Low Risks", scorecard["low"])
+    
+    # 3. Recommended Action badge
+    st.markdown(f"**Recommended Action:** `{scorecard['recommended']}`")
+    st.write("---")
+    
+    # 4. Formatted results display
+    display_formatted_results(results)
             
     st.write("---")
     st.markdown("### Download & Delivery")

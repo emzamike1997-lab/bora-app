@@ -23,6 +23,15 @@ RED = HexColor("#C62828")
 AMBER = HexColor("#F57C00")
 GREEN = HexColor("#2E7D32")
 
+# Hex string versions for use inside Paragraph HTML f-strings
+NAVY_HEX = "#1B2A4A"
+GOLD_HEX = "#C9A84C"
+WHITE_HEX = "#FFFFFF"
+RED_HEX = "#C62828"
+AMBER_HEX = "#F57C00"
+GREEN_HEX = "#2E7D32"
+GREY_HEX = "#666666"
+
 def parse_bora_report(text: str) -> dict:
     data = {
         "document_type": "Legal Document Analysis",
@@ -154,13 +163,23 @@ class BORADocTemplate(BaseDocTemplate):
         super().__init__(filename, **kw)
         self.document_type = document_type
 
+def _color_to_hex(color_obj):
+    """Convert a ReportLab color object to a hex string for use in HTML."""
+    if color_obj == RED: return RED_HEX
+    if color_obj == AMBER: return AMBER_HEX
+    if color_obj == GREEN: return GREEN_HEX
+    if color_obj == NAVY: return NAVY_HEX
+    if color_obj == GOLD: return GOLD_HEX
+    return GREY_HEX
+
 def make_risk_table(risk_str, stripe_color, styles):
     lines = risk_str.split("\n")
     title = lines[0].strip()
+    stripe_hex = _color_to_hex(stripe_color)
     
     normal = styles['Normal']
     navy_bold = ParagraphStyle('NavyBold', parent=normal, fontName='Helvetica-Bold', textColor=NAVY)
-    grey_label = "<font color='#666666'>%s</font>"
+    grey_label = f"<font color='{GREY_HEX}'>%s</font>"
     
     content = [Paragraph(title, navy_bold)]
     
@@ -171,9 +190,9 @@ def make_risk_table(risk_str, stripe_color, styles):
             kl = k.lower().strip()
             
             if "clause" in kl:
-                content.append(Paragraph(f"{grey_label % k + ':'} <font color='#1B2A4A'>{v}</font>", normal))
+                content.append(Paragraph(f"{grey_label % k + ':'} <font color='{NAVY_HEX}'>{v}</font>", normal))
             elif "law" in kl:
-                content.append(Paragraph(f"{grey_label % k + ':'} <font color='{stripe_color}'>{v}</font>", normal))
+                content.append(Paragraph(f"{grey_label % k + ':'} <font color='{stripe_hex}'>{v}</font>", normal))
             elif "what to do" in kl or "action" in kl:
                 t = Table([[Paragraph(f"<b>{k}:</b> {v}", normal)]], style=[
                     ('BACKGROUND', (0,0), (0,0), HexColor("#FFF8E1")),
@@ -368,7 +387,7 @@ def generate_pdf_report(text: str) -> bytes:
         
         n_data = []
         for i, item in enumerate(data['negotiation_list']):
-            bullet = Paragraph(f"<font color='{GOLD}'>■</font> {i+1}.", normal)
+            bullet = Paragraph(f"<font color='{GOLD_HEX}'>■</font> {i+1}.", normal)
             text = Paragraph(item, normal)
             n_data.append([bullet, text])
             
