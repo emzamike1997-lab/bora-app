@@ -6,6 +6,8 @@ from modules.analyzer import run_analysis, extract_text_from_file, get_document_
 from modules.prompts import get_contract_risk_prompt
 from modules.report import generate_pdf_report, send_report_email
 
+st.set_page_config(page_title="Contract Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
+
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
@@ -22,8 +24,6 @@ header {visibility: hidden;}
     padding-top: 1rem;}
 </style>
 """, unsafe_allow_html=True)
-
-st.set_page_config(page_title="Contract Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
 
 # Inject Custom CSS
 st.markdown("""
@@ -161,7 +161,7 @@ if "last_results" in st.session_state and st.session_state.last_type == "Contrac
     st.write("---")
     
     # 4. Full results text
-    st.markdown(results)
+    st.markdown(results, unsafe_allow_html=True)
             
     st.write("---")
     st.markdown("### Download & Delivery")

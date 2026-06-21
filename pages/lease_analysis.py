@@ -6,6 +6,8 @@ from modules.analyzer import run_analysis, extract_text_from_file, get_document_
 from modules.prompts import get_lease_prompt
 from modules.report import generate_pdf_report, send_report_email
 
+st.set_page_config(page_title="Lease Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
+
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
@@ -22,8 +24,6 @@ header {visibility: hidden;}
     padding-top: 1rem;}
 </style>
 """, unsafe_allow_html=True)
-
-st.set_page_config(page_title="Lease Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -163,13 +163,8 @@ if "last_results" in st.session_state and st.session_state.last_type == "Lease A
         st.markdown(f"**Recommended Action:** `{scorecard['recommended']}`")
         st.write("---")
         
-        # Custom rendering for the results
-        for line in results.split("\n"):
-            if "[RED" in line or "[AMBER" in line or "[GREEN" in line:
-                color = "#C62828" if "RED" in line else "#F57C00" if "AMBER" in line else "#2E7D32"
-                st.markdown(f"<h4 style='color:{color}'>{line}</h4>", unsafe_allow_html=True)
-            else:
-                st.write(line)
+        # 4. Full results text
+        st.markdown(results, unsafe_allow_html=True)
             
     st.write("---")
     st.markdown("### Download & Delivery")
