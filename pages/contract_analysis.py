@@ -4,6 +4,9 @@ import stripe
 from modules.database import can_analyze, consume_analysis
 from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_contract_risk_prompt
+import importlib
+import modules.report
+importlib.reload(modules.report)
 from modules.report import generate_pdf_report, send_report_email
 from modules.results_display import display_formatted_results
 
