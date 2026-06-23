@@ -167,6 +167,7 @@ if "last_results" in st.session_state and st.session_state.last_type == "Employm
     
     if st.button("Generate & Email PDF Report"):
         with st.spinner("Generating PDF..."):
+            print("DEBUG: results content before generate_pdf_report():", results[:200])
             pdf_bytes = generate_pdf_report(results)
             success = send_report_email(st.session_state.last_email, pdf_bytes, "Employment Analysis")
             

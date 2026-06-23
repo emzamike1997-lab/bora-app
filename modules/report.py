@@ -32,82 +32,250 @@ AMBER_HEX = "#F57C00"
 GREEN_HEX = "#2E7D32"
 GREY_HEX = "#666666"
 
-def parse_bora_report(text: str) -> dict:
-    data = {
+def parse_analysis_results(text: str) -> dict:
+    """
+    Parse analysis results into structured data for PDF generation.
+    Returns a dict with all sections.
+    """
+    result = {
         "document_type": "Legal Document Analysis",
         "analysis_date": "N/A",
         "analysis_depth": "Standard",
         "reference": "BORA-" + str(abs(hash(text)))[:6],
-        "overall": "GREEN",
-        "critical_count": 0,
-        "moderate_count": 0,
-        "low_count": 0,
-        "total_count": 0,
+        "overall_rating": "RED",
+        "recommended_action": "Do Not Sign",
         "executive_summary": "",
         "critical_risks": [],
         "moderate_risks": [],
         "low_risks": [],
-        "negotiation_list": [],
-        "red_line_clauses": []
+        "negotiation_priorities": [],
+        "red_line_clauses": [],
+        "disclaimer": ""
     }
+    
+    if not text or len(text.strip()) == 0:
+        return result
     
     # Metadata
     dt_match = re.search(r"Document Type:\s*(.+)", text, re.IGNORECASE)
-    if dt_match: data["document_type"] = dt_match.group(1).strip()
+    if dt_match: result["document_type"] = dt_match.group(1).strip()
     
     ad_match = re.search(r"Analysis Date:\s*(.+)", text, re.IGNORECASE)
-    if ad_match: data["analysis_date"] = ad_match.group(1).strip()
+    if ad_match: result["analysis_date"] = ad_match.group(1).strip()
     
     dp_match = re.search(r"Analysis Depth:\s*(.+)", text, re.IGNORECASE)
-    if dp_match: data["analysis_depth"] = dp_match.group(1).strip()
+    if dp_match: result["analysis_depth"] = dp_match.group(1).strip()
     
-    # Scorecard
-    crit_match = re.search(r"Critical\s*(?:\(Red\))?:\s*(\d+)", text, re.IGNORECASE)
-    if crit_match: data["critical_count"] = int(crit_match.group(1))
+    # Detect overall rating
+    text_upper = text.upper()
+    if "OVERALL RISK RATING" in text_upper:
+        pos = text_upper.find("OVERALL")
+        end_pos = min(pos + 100, len(text_upper))
+        context_str = text_upper[pos:end_pos]
+        if "GREEN" in context_str:
+            result["overall_rating"] = "GREEN"
+        elif "AMBER" in context_str:
+            result["overall_rating"] = "AMBER"
+        else:
+            result["overall_rating"] = "RED"
     
-    mod_match = re.search(r"Moderate\s*(?:\(Amber\))?:\s*(\d+)", text, re.IGNORECASE)
-    if mod_match: data["moderate_count"] = int(mod_match.group(1))
-    
-    low_match = re.search(r"Low\s*(?:\(Green\))?:\s*(\d+)", text, re.IGNORECASE)
-    if low_match: data["low_count"] = int(low_match.group(1))
-    
-    data["total_count"] = data["critical_count"] + data["moderate_count"] + data["low_count"]
-    
-    ov_match = re.search(r"Overall\s*risk\s*rating:\s*(RED|AMBER|GREEN)", text, re.IGNORECASE)
-    if ov_match:
-        data["overall"] = ov_match.group(1).upper()
-    else:
-        if data["critical_count"] > 0: data["overall"] = "RED"
-        elif data["moderate_count"] > 0: data["overall"] = "AMBER"
-    
-    # Exec Summary
-    es_match = re.search(r"EXECUTIVE SUMMARY[^\n]*\n(.*?)(?=\n\n(?:RISK SCORECARD|---|CRITICAL RISKS))", text, re.DOTALL)
-    if es_match:
-        data["executive_summary"] = es_match.group(1).strip()
-    
-    # Helper to extract sections
-    def extract_section(header_regex, next_header_regex):
-        pattern = re.compile(f"{header_regex}.*?\n(.*?)?(?=\n(?:---|{next_header_regex}|$))", re.DOTALL | re.IGNORECASE)
-        match = pattern.search(text)
-        return match.group(1).strip() if match and match.group(1) else ""
+    # Also check recommended action
+    if "DO NOT SIGN" in text_upper:
+        result["overall_rating"] = "RED"
+        result["recommended_action"] = "Do Not Sign"
+    elif "NEGOTIATE FIRST" in text_upper:
+        result["overall_rating"] = "AMBER"
+        result["recommended_action"] = "Negotiate First"
+    elif "REASONABLE TO SIGN" in text_upper:
+        result["overall_rating"] = "GREEN"
+        result["recommended_action"] = "Reasonable to Sign"
         
-    crit_text = extract_section(r"CRITICAL RISKS.*?\n---", r"MODERATE RISKS|LOW RISKS|NEGOTIATION|RED LINE|DISCLAIMER")
-    mod_text = extract_section(r"MODERATE RISKS.*?\n---", r"LOW RISKS|NEGOTIATION|RED LINE|DISCLAIMER")
-    low_text = extract_section(r"LOW RISKS.*?\n---", r"NEGOTIATION|RED LINE|DISCLAIMER")
-    
-    data["critical_risks"] = [r.strip() for r in re.split(r"🔴", crit_text) if r.strip()]
-    data["moderate_risks"] = [r.strip() for r in re.split(r"🟡", mod_text) if r.strip()]
-    data["low_risks"] = [r.strip() for r in re.split(r"🟢", low_text) if r.strip()]
-    
-    neg_text = extract_section(r"NEGOTIATION PRIORITY LIST.*?\n---", r"RED LINE|DISCLAIMER")
-    if neg_text:
-        data["negotiation_list"] = [n.strip() for n in re.split(r"\n\d+\.", "\n" + neg_text) if n.strip() and not n.strip().startswith("Numbered list")]
+    # Extract executive summary
+    if "EXECUTIVE SUMMARY" in text_upper:
+        start = text_upper.find("EXECUTIVE SUMMARY") + len("EXECUTIVE SUMMARY")
+        # Find the next major section
+        next_sections = [
+            "RISK SCORECARD",
+            "CRITICAL RISKS", 
+            "MODERATE RISKS",
+            "LOW RISKS",
+            "---"
+        ]
+        end = len(text)
+        for section in next_sections:
+            pos = text_upper.find(section, start)
+            if pos != -1 and pos < end:
+                end = pos
+        summary_raw = text[start:end].strip()
+        # Clean up leading hyphens or colons
+        if summary_raw.startswith(":"):
+            summary_raw = summary_raw[1:].strip()
+        if summary_raw.startswith("---"):
+            summary_raw = summary_raw[3:].strip()
+        result["executive_summary"] = summary_raw
         
-    red_text = extract_section(r"RED LINE CLAUSES.*?\n---", r"DISCLAIMER")
-    if red_text and "No absolute red line clauses found" not in red_text:
-        data["red_line_clauses"] = [r.strip() for r in red_text.split("\n\n") if r.strip()]
+    # Extract individual risks using regex patterns (capturing emoji line in group 1)
+    # Find all critical risks (🔴 markers)
+    critical_pattern = r'(🔴[^\n]*RISK[^\n]*\n.*?)(?=🔴|🟡|🟢|MODERATE RISKS|LOW RISKS|NEGOTIATION|RED LINE|DISCLAIMER|$)'
+    critical_matches = re.findall(critical_pattern, text, re.DOTALL)
+    for match in critical_matches:
+        risk_text = match.strip()
+        if risk_text:
+            result["critical_risks"].append(parse_single_risk(risk_text))
             
-    return data
+    # Find all moderate risks (🟡 markers)
+    moderate_pattern = r'(🟡[^\n]*RISK[^\n]*\n.*?)(?=🔴|🟡|🟢|CRITICAL RISKS|LOW RISKS|NEGOTIATION|RED LINE|DISCLAIMER|$)'
+    moderate_matches = re.findall(moderate_pattern, text, re.DOTALL)
+    for match in moderate_matches:
+        risk_text = match.strip()
+        if risk_text:
+            result["moderate_risks"].append(parse_single_risk(risk_text))
+            
+    # Find all low risks (🟢 markers)
+    low_pattern = r'(🟢[^\n]*RISK[^\n]*\n.*?)(?=🔴|🟡|🟢|CRITICAL RISKS|MODERATE RISKS|NEGOTIATION|RED LINE|DISCLAIMER|$)'
+    low_matches = re.findall(low_pattern, text, re.DOTALL)
+    for match in low_matches:
+        risk_text = match.strip()
+        if risk_text:
+            result["low_risks"].append(parse_single_risk(risk_text))
+            
+    # Also parse negotiation priorities and red line clauses if they exist in matches
+    neg_match = re.search(r"NEGOTIATION PRIORITY LIST.*?\n(.*?)(?=\n(?:---|RED LINE|DISCLAIMER|$))", text, re.DOTALL | re.IGNORECASE)
+    if neg_match:
+        neg_text = neg_match.group(1).strip()
+        neg_text_lines = [l.strip() for l in neg_text.split('\n') if l.strip()]
+        for line in neg_text_lines:
+            if line.upper().startswith("NEGOTIATION") or line.startswith("---") or line.startswith("Numbered list"):
+                continue
+            clean_line = re.sub(r'^(?:\d+\.|\-|\*|■)\s*', '', line).strip()
+            if clean_line:
+                result["negotiation_priorities"].append(clean_line)
+
+    red_match = re.search(r"RED LINE CLAUSES.*?\n(.*?)(?=\n(?:---|DISCLAIMER|$))", text, re.DOTALL | re.IGNORECASE)
+    if red_match:
+        red_text = red_match.group(1).strip()
+        if "No absolute red line clauses" not in red_text:
+            parts = red_text.split('\n\n') if '\n\n' in red_text else red_text.split('\n')
+            for part in parts:
+                part = part.strip()
+                if part and not part.startswith("---") and not part.upper().startswith("RED LINE"):
+                    result["red_line_clauses"].append(part)
+                    
+    # Try simpler line-by-line extraction as fallback if no risks found via regex
+    if not result["critical_risks"] and not result["moderate_risks"] and not result["low_risks"]:
+        lines = text.split('\n')
+        current_risk = None
+        current_section = None
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Detect section changes
+            if 'CRITICAL RISKS' in line.upper():
+                current_section = 'critical'
+            elif 'MODERATE RISKS' in line.upper():
+                current_section = 'moderate'
+            elif 'LOW RISKS' in line.upper():
+                current_section = 'low'
+            elif 'NEGOTIATION PRIORITY' in line.upper():
+                current_section = 'negotiation'
+            elif 'RED LINE' in line.upper():
+                current_section = 'red_line'
+                
+            # Detect risk starter lines
+            elif (line.startswith('🔴') or line.startswith('🟡') or line.startswith('🟢') or 
+                  ('RISK' in line.upper() and current_section in ['critical', 'moderate', 'low'])):
+                if current_risk:
+                    if current_section == 'critical':
+                        result["critical_risks"].append(current_risk)
+                    elif current_section == 'moderate':
+                        result["moderate_risks"].append(current_risk)
+                    elif current_section == 'low':
+                        result["low_risks"].append(current_risk)
+                
+                clean_title = line
+                for emoji in ['🔴', '🟡', '🟢']:
+                    clean_title = clean_title.replace(emoji, '')
+                clean_title = clean_title.strip()
+                clean_title = re.sub(r'^RISK\s*\d+\s*:\s*', '', clean_line, flags=re.IGNORECASE)
+                
+                current_risk = {
+                    "title": clean_title,
+                    "clause": "",
+                    "law": "",
+                    "explanation": "",
+                    "impact": "",
+                    "action": ""
+                }
+            elif current_risk:
+                if line.startswith('Clause:'):
+                    current_risk["clause"] = line.split('Clause:', 1)[-1].strip()
+                elif line.startswith('Law violated:'):
+                    current_risk["law"] = line.split('Law violated:', 1)[-1].strip()
+                elif line.lower().startswith('plain english:'):
+                    current_risk["explanation"] = line.split(':', 1)[-1].strip()
+                elif line.startswith('Financial impact:'):
+                    current_risk["impact"] = line.split('Financial impact:', 1)[-1].strip()
+                elif line.startswith('What to do:'):
+                    current_risk["action"] = line.split('What to do:', 1)[-1].strip()
+            elif current_section == 'negotiation':
+                if line and not line.upper().startswith('NEGOTIATION') and not line.startswith('---'):
+                    clean_line = re.sub(r'^(?:\d+\.|\-|\*|■)\s*', '', line).strip()
+                    if clean_line:
+                        result["negotiation_priorities"].append(clean_line)
+            elif current_section == 'red_line':
+                if line and not line.upper().startswith('RED LINE') and "No absolute red line clauses" not in line and not line.startswith('---'):
+                    result["red_line_clauses"].append(line)
+        
+        # Add last risk if exists
+        if current_risk and current_section:
+            if current_section == 'critical':
+                result["critical_risks"].append(current_risk)
+            elif current_section == 'moderate':
+                result["moderate_risks"].append(current_risk)
+            elif current_section == 'low':
+                result["low_risks"].append(current_risk)
+                
+    return result
+
+
+def parse_single_risk(text: str) -> dict:
+    """Extract structured data from a single risk text block."""
+    risk = {
+        "title": "",
+        "clause": "",
+        "law": "",
+        "explanation": "",
+        "impact": "",
+        "action": ""
+    }
+    lines = text.split('\n')
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith('Clause:'):
+            risk["clause"] = line.split('Clause:', 1)[-1].strip()
+        elif line.startswith('Law violated:'):
+            risk["law"] = line.split('Law violated:', 1)[-1].strip()
+        elif line.lower().startswith('plain english:'):
+            risk["explanation"] = line.split(':', 1)[-1].strip()
+        elif line.startswith('Financial impact:'):
+            risk["impact"] = line.split('Financial impact:', 1)[-1].strip()
+        elif line.startswith('What to do:'):
+            risk["action"] = line.split('What to do:', 1)[-1].strip()
+        else:
+            # Set title to first line that doesn't start with known prefixes, cleaned of emojis and risk prefixes
+            clean_line = line
+            for emoji in ['🔴', '🟡', '🟢']:
+                clean_line = clean_line.replace(emoji, '')
+            clean_line = clean_line.strip()
+            clean_line = re.sub(r'^RISK\s*\d+\s*:\s*', '', clean_line, flags=re.IGNORECASE)
+            if not risk["title"]:
+                risk["title"] = clean_line
+    return risk
 
 def onCover(canvas, doc):
     canvas.saveState()
@@ -172,40 +340,54 @@ def _color_to_hex(color_obj):
     if color_obj == GOLD: return GOLD_HEX
     return GREY_HEX
 
-def make_risk_table(risk_str, stripe_color, styles):
-    lines = risk_str.split("\n")
-    title = lines[0].strip()
+def make_risk_table(risk, stripe_color, styles):
+    if isinstance(risk, str):
+        risk = parse_single_risk(risk)
+        
+    title = risk.get("title", "").strip()
     stripe_hex = _color_to_hex(stripe_color)
     
     normal = styles['Normal']
-    navy_bold = ParagraphStyle('NavyBold', parent=normal, fontName='Helvetica-Bold', textColor=NAVY)
+    navy_bold = ParagraphStyle('NavyBoldRisk', parent=normal, fontName='Helvetica-Bold', textColor=NAVY)
     grey_label = f"<font color='{GREY_HEX}'>%s</font>"
     
-    content = [Paragraph(title, navy_bold)]
-    
-    for line in lines[1:]:
-        if not line.strip(): continue
-        if ":" in line:
-            k, v = line.split(":", 1)
-            kl = k.lower().strip()
-            
-            if "clause" in kl:
-                content.append(Paragraph(f"{grey_label % k + ':'} <font color='{NAVY_HEX}'>{v}</font>", normal))
-            elif "law" in kl:
-                content.append(Paragraph(f"{grey_label % k + ':'} <font color='{stripe_hex}'>{v}</font>", normal))
-            elif "what to do" in kl or "action" in kl:
-                t = Table([[Paragraph(f"<b>{k}:</b> {v}", normal)]], style=[
-                    ('BACKGROUND', (0,0), (0,0), HexColor("#FFF8E1")),
-                    ('TOPPADDING', (0,0), (0,0), 6),
-                    ('BOTTOMPADDING', (0,0), (0,0), 6),
-                ])
-                content.append(t)
-            elif "financial" in kl:
-                content.append(Paragraph(f"<b>{k}:</b> {v}", normal))
-            else:
-                content.append(Paragraph(f"{grey_label % k + ':'} {v}", normal))
-        else:
-            content.append(Paragraph(line, normal))
+    content = []
+    if title:
+        content.append(Paragraph(title, navy_bold))
+        content.append(Spacer(1, 4))
+        
+    if risk.get("clause"):
+        content.append(Paragraph(f"{grey_label % 'Clause:'} <font color='{NAVY_HEX}'>{html.escape(risk['clause'])}</font>", normal))
+        content.append(Spacer(1, 4))
+        
+    if risk.get("law"):
+        content.append(Paragraph(f"{grey_label % 'Law violated:'} <font color='{stripe_hex}'>{html.escape(risk['law'])}</font>", normal))
+        content.append(Spacer(1, 4))
+        
+    if risk.get("explanation"):
+        content.append(Paragraph(f"<b>Plain English:</b> {html.escape(risk['explanation'])}", normal))
+        content.append(Spacer(1, 4))
+        
+    if risk.get("impact"):
+        content.append(Paragraph(f"<b>Financial impact:</b> {html.escape(risk['impact'])}", normal))
+        content.append(Spacer(1, 4))
+        
+    if risk.get("action"):
+        t = Table([[Paragraph(f"<b>What to do:</b> {html.escape(risk['action'])}", normal)]], style=[
+            ('BACKGROUND', (0,0), (0,0), HexColor("#FFF8E1")),
+            ('TOPPADDING', (0,0), (0,0), 6),
+            ('BOTTOMPADDING', (0,0), (0,0), 6),
+            ('LEFTPADDING', (0,0), (0,0), 8),
+            ('RIGHTPADDING', (0,0), (0,0), 8),
+        ])
+        content.append(t)
+        
+    # Remove trailing spacer if present
+    if content and isinstance(content[-1], Spacer):
+        content.pop()
+        
+    if not content:
+        return Paragraph("", normal)
             
     t = Table([["", content]], colWidths=[4, A4[0]-100-4], style=[
         ('BACKGROUND', (0,0), (0,0), stripe_color),
@@ -219,10 +401,10 @@ def make_risk_table(risk_str, stripe_color, styles):
     return KeepTogether(t)
 
 def generate_pdf_report(text: str) -> bytes:
-    data = parse_bora_report(text)
+    parsed = parse_analysis_results(text)
     
     buffer = io.BytesIO()
-    doc = BORADocTemplate(buffer, data['document_type'], pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    doc = BORADocTemplate(buffer, parsed['document_type'], pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
     
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='normal')
     template_cover = PageTemplate(id='Cover', frames=frame, onPage=onCover)
@@ -262,7 +444,7 @@ def generate_pdf_report(text: str) -> bytes:
     card_content = []
     card_content.append(Spacer(1, 20))
     card_content.append(Paragraph("C O N F I D E N T I A L   R I S K   A N A L Y S I S", navy_10_spaced_center))
-    card_content.append(Paragraph(data['document_type'].upper(), navy_24_bold_center))
+    card_content.append(Paragraph(parsed['document_type'].upper(), navy_24_bold_center))
     card_content.append(Spacer(1, 10))
     card_content.append(HRFlowable(width="80%", thickness=1, color=GOLD))
     card_content.append(Spacer(1, 20))
@@ -270,17 +452,24 @@ def generate_pdf_report(text: str) -> bytes:
     cw = (A4[0]-100)/3
     t_data = [
         [Paragraph("Analysis Date", grey_10_center), Paragraph("Analysis Depth", grey_10_center), Paragraph("Reference", grey_10_center)],
-        [Paragraph(data['analysis_date'], navy_12_bold_center), Paragraph(data['analysis_depth'], navy_12_bold_center), Paragraph(data['reference'], navy_12_bold_center)]
+        [Paragraph(parsed['analysis_date'], navy_12_bold_center), Paragraph(parsed['analysis_depth'], navy_12_bold_center), Paragraph(parsed['reference'], navy_12_bold_center)]
     ]
     card_content.append(Table(t_data, colWidths=[cw, cw, cw]))
     card_content.append(Spacer(1, 30))
     
-    badge_color = RED if data['overall'] == 'RED' else (AMBER if data['overall'] == 'AMBER' else GREEN)
-    badge_text = "HIGH RISK" if data['overall'] == 'RED' else ("MODERATE RISK" if data['overall'] == 'AMBER' else "LOW RISK")
-    
-    badge_table = Table([[Paragraph(badge_text, white_14_bold_center)]], colWidths=[200], rowHeights=[40])
+    if parsed["overall_rating"] == "RED":
+        rating_text = "HIGH RISK"
+        rating_color = RED
+    elif parsed["overall_rating"] == "AMBER":
+        rating_text = "MODERATE RISK"
+        rating_color = AMBER
+    else:
+        rating_text = "LOW RISK"
+        rating_color = GREEN
+        
+    badge_table = Table([[Paragraph(rating_text, white_14_bold_center)]], colWidths=[200], rowHeights=[40])
     badge_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (0,0), badge_color),
+        ('BACKGROUND', (0,0), (0,0), rating_color),
         ('ALIGN', (0,0), (0,0), 'CENTER'),
         ('VALIGN', (0,0), (0,0), 'MIDDLE'),
     ]))
@@ -307,7 +496,12 @@ def generate_pdf_report(text: str) -> bytes:
     elements.append(PageBreak())
     
     # ---------------- EXECUTIVE SUMMARY PAGE ----------------
-    t = Table([[Paragraph("EXECUTIVE SUMMARY", white_14_bold)]], colWidths=[A4[0]-100], style=[('BACKGROUND', (0,0), (0,0), NAVY), ('LEFTPADDING', (0,0), (0,0), 10)])
+    t = Table([[Paragraph("EXECUTIVE SUMMARY", white_14_bold)]], colWidths=[A4[0]-100], style=[
+        ('BACKGROUND', (0,0), (0,0), NAVY), 
+        ('LEFTPADDING', (0,0), (0,0), 10),
+        ('TOPPADDING', (0,0), (0,0), 6),
+        ('BOTTOMPADDING', (0,0), (0,0), 6)
+    ])
     elements.append(t)
     elements.append(Spacer(1, 20))
     
@@ -322,18 +516,23 @@ def generate_pdf_report(text: str) -> bytes:
             ('VALIGN', (0,1), (0,1), 'TOP'),
         ])
         
+    critical_count = len(parsed["critical_risks"])
+    moderate_count = len(parsed["moderate_risks"])
+    low_count = len(parsed["low_risks"])
+    total = critical_count + moderate_count + low_count
+    
     sb = Table([[ 
-        make_score_box("Total Risks", data['total_count'], NAVY),
-        make_score_box("Critical/Red", data['critical_count'], RED),
-        make_score_box("Moderate/Amber", data['moderate_count'], AMBER),
-        make_score_box("Low/Green", data['low_count'], GREEN)
+        make_score_box("Total Risks", total, NAVY),
+        make_score_box("Critical/Red", critical_count, RED),
+        make_score_box("Moderate/Amber", moderate_count, AMBER),
+        make_score_box("Low/Green", low_count, GREEN)
     ]], style=[('ALIGN', (0,0), (-1,-1), 'CENTER')])
     elements.append(sb)
     elements.append(Spacer(1, 20))
     
-    action_bg = HexColor("#FFEBEE") if data['overall'] == "RED" else (HexColor("#FFF3E0") if data['overall'] == "AMBER" else HexColor("#E8F5E9"))
-    if data['overall'] == "RED": action_text = "⛔ DO NOT SIGN — This document contains critical legal violations that must be addressed before signing."
-    elif data['overall'] == "AMBER": action_text = "⚠️ NEGOTIATE FIRST — Review and negotiate flagged clauses before signing."
+    action_bg = HexColor("#FFEBEE") if parsed['overall_rating'] == "RED" else (HexColor("#FFF3E0") if parsed['overall_rating'] == "AMBER" else HexColor("#E8F5E9"))
+    if parsed['overall_rating'] == "RED": action_text = "⛔ DO NOT SIGN — This document contains critical legal violations that must be addressed before signing."
+    elif parsed['overall_rating'] == "AMBER": action_text = "⚠️ NEGOTIATE FIRST — Review and negotiate flagged clauses before signing."
     else: action_text = "✅ REASONABLE TO SIGN — Standard legal review recommended."
     
     t = Table([[Paragraph(action_text, normal)]], colWidths=[A4[0]-100], style=[
@@ -343,19 +542,22 @@ def generate_pdf_report(text: str) -> bytes:
     elements.append(t)
     elements.append(Spacer(1, 20))
     
-    if data['executive_summary']:
-        elements.append(Paragraph(data['executive_summary'], ParagraphStyle('ES', parent=normal, fontSize=11, textColor=DARK_GREY)))
+    if parsed['executive_summary']:
+        elements.append(Paragraph(parsed['executive_summary'], ParagraphStyle('ES', parent=normal, fontSize=11, textColor=DARK_GREY)))
         elements.append(Spacer(1, 20))
     
     elements.append(Paragraph("<b>Table of Contents</b>", ParagraphStyle('TOC_Title', parent=normal, fontSize=12, textColor=NAVY)))
     elements.append(Spacer(1, 10))
     
     toc_items = ["1. Executive Summary"]
-    if data['critical_risks']: toc_items.append(f"{len(toc_items)+1}. Critical Risks")
-    if data['moderate_risks']: toc_items.append(f"{len(toc_items)+1}. Moderate Risks")
-    if data['low_risks']: toc_items.append(f"{len(toc_items)+1}. Low Risks")
-    if data['negotiation_list']: toc_items.append(f"{len(toc_items)+1}. Negotiation Priority List")
-    if data['red_line_clauses']: toc_items.append(f"{len(toc_items)+1}. Red Line Clauses")
+    if total == 0 and len(text) > 100:
+        toc_items.append("2. Analysis Results")
+    else:
+        if parsed['critical_risks']: toc_items.append(f"{len(toc_items)+1}. Critical Risks")
+        if parsed['moderate_risks']: toc_items.append(f"{len(toc_items)+1}. Moderate Risks")
+        if parsed['low_risks']: toc_items.append(f"{len(toc_items)+1}. Low Risks")
+    if parsed['negotiation_priorities']: toc_items.append(f"{len(toc_items)+1}. Negotiation Priority List")
+    if parsed['red_line_clauses']: toc_items.append(f"{len(toc_items)+1}. Red Line Clauses")
     
     for item in toc_items:
         elements.append(Paragraph(item, normal))
@@ -363,33 +565,64 @@ def generate_pdf_report(text: str) -> bytes:
     elements.append(PageBreak())
     
     # ---------------- RISK SECTIONS ----------------
-    def add_risk_section(title, risks, color):
-        if not risks: return
-        t = Table([[Paragraph(title, white_13_bold)]], colWidths=[A4[0]-100], style=[('BACKGROUND', (0,0), (0,0), NAVY), ('LEFTPADDING', (0,0), (0,0), 10)])
+    def add_risk_section_new(banner_text, risks, color):
+        t = Table([[Paragraph(banner_text, white_13_bold)]], colWidths=[A4[0]-100], style=[
+            ('BACKGROUND', (0,0), (0,0), NAVY), 
+            ('LEFTPADDING', (0,0), (0,0), 10),
+            ('TOPPADDING', (0,0), (0,0), 6),
+            ('BOTTOMPADDING', (0,0), (0,0), 6)
+        ])
         elements.append(t)
         elements.append(Spacer(1, 15))
-        for risk in risks:
-            elements.append(make_risk_table(risk, color, styles))
-            elements.append(Spacer(1, 8))
-        elements.append(Spacer(1, 10))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=GOLD))
+        
+        if not risks:
+            risk_label = "critical" if color == RED else ("moderate" if color == AMBER else "low")
+            elements.append(Paragraph(f"No {risk_label} risks identified in this document.", normal))
+            elements.append(Spacer(1, 15))
+        else:
+            for risk in risks:
+                elements.append(make_risk_table(risk, color, styles))
+                elements.append(Spacer(1, 8))
+            elements.append(Spacer(1, 10))
+            elements.append(HRFlowable(width="100%", thickness=0.5, color=GOLD))
+            elements.append(Spacer(1, 15))
+            
+    if total == 0 and len(text) > 100:
+        # Fallback: render raw results as text
+        elements.append(Table([[Paragraph("ANALYSIS RESULTS", white_14_bold)]], colWidths=[A4[0]-100], style=[
+            ('BACKGROUND', (0,0), (0,0), NAVY), 
+            ('LEFTPADDING', (0,0), (0,0), 10),
+            ('TOPPADDING', (0,0), (0,0), 6),
+            ('BOTTOMPADDING', (0,0), (0,0), 6)
+        ]))
         elements.append(Spacer(1, 15))
         
-    add_risk_section("CRITICAL RISKS", data['critical_risks'], RED)
-    add_risk_section("MODERATE RISKS", data['moderate_risks'], AMBER)
-    add_risk_section("LOW RISKS", data['low_risks'], GREEN)
-    
+        for line in text.split('\n'):
+            line = line.strip()
+            if line:
+                elements.append(Paragraph(html.escape(line), normal))
+                elements.append(Spacer(1, 4))
+    else:
+        add_risk_section_new("CRITICAL RISKS — Must Address Before Signing", parsed['critical_risks'], RED)
+        add_risk_section_new("MODERATE RISKS — Should Negotiate", parsed['moderate_risks'], AMBER)
+        add_risk_section_new("LOW RISKS — Acceptable Clauses", parsed['low_risks'], GREEN)
+        
     # ---------------- NEGOTIATION PRIORITY LIST ----------------
-    if data['negotiation_list']:
-        t = Table([[Paragraph("NEGOTIATION PRIORITY LIST", white_13_bold)]], colWidths=[A4[0]-100], style=[('BACKGROUND', (0,0), (0,0), NAVY), ('LEFTPADDING', (0,0), (0,0), 10)])
+    if parsed['negotiation_priorities']:
+        t = Table([[Paragraph("NEGOTIATION PRIORITY LIST", white_13_bold)]], colWidths=[A4[0]-100], style=[
+            ('BACKGROUND', (0,0), (0,0), NAVY), 
+            ('LEFTPADDING', (0,0), (0,0), 10),
+            ('TOPPADDING', (0,0), (0,0), 6),
+            ('BOTTOMPADDING', (0,0), (0,0), 6)
+        ])
         elements.append(t)
         elements.append(Spacer(1, 15))
         
         n_data = []
-        for i, item in enumerate(data['negotiation_list']):
+        for i, item in enumerate(parsed['negotiation_priorities']):
             bullet = Paragraph(f"<font color='{GOLD_HEX}'>■</font> {i+1}.", normal)
-            text = Paragraph(item, normal)
-            n_data.append([bullet, text])
+            text_p = Paragraph(html.escape(item), normal)
+            n_data.append([bullet, text_p])
             
         nt = Table(n_data, colWidths=[30, A4[0]-130], style=[
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -403,13 +636,18 @@ def generate_pdf_report(text: str) -> bytes:
         elements.append(Spacer(1, 20))
         
     # ---------------- RED LINE CLAUSES ----------------
-    if data['red_line_clauses']:
-        t = Table([[Paragraph("⚠️ RED LINE CLAUSES — Do not sign if these are not removed", white_13_bold)]], colWidths=[A4[0]-100], style=[('BACKGROUND', (0,0), (0,0), RED), ('LEFTPADDING', (0,0), (0,0), 10)])
+    if parsed['red_line_clauses']:
+        t = Table([[Paragraph("⚠️ RED LINE CLAUSES — Do not sign if these are not removed", white_13_bold)]], colWidths=[A4[0]-100], style=[
+            ('BACKGROUND', (0,0), (0,0), RED), 
+            ('LEFTPADDING', (0,0), (0,0), 10),
+            ('TOPPADDING', (0,0), (0,0), 6),
+            ('BOTTOMPADDING', (0,0), (0,0), 6)
+        ])
         elements.append(t)
         elements.append(Spacer(1, 15))
         
-        for r in data['red_line_clauses']:
-            rt = Table([[Paragraph(r, ParagraphStyle('R', parent=normal, textColor=RED, fontName='Helvetica-Bold'))]], colWidths=[A4[0]-100], style=[
+        for r in parsed['red_line_clauses']:
+            rt = Table([[Paragraph(html.escape(r), ParagraphStyle('R', parent=normal, textColor=RED, fontName='Helvetica-Bold'))]], colWidths=[A4[0]-100], style=[
                 ('BOX', (0,0), (-1,-1), 2, RED),
                 ('PADDING', (0,0), (-1,-1), 10),
                 ('BACKGROUND', (0,0), (-1,-1), HexColor("#FFEBEE"))
