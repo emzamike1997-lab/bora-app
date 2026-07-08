@@ -247,3 +247,107 @@ def generate_pdf_report(results_text, doc_type="Legal Document", analysis_depth=
     doc.build(story)
     buffer.seek(0)
     return buffer.read()
+
+
+import resend
+
+
+def send_pdf_email(
+    to_email,
+    pdf_bytes,
+    doc_type="Legal Document"):
+
+    import os
+    import base64
+
+    api_key = os.getenv("RESEND_API_KEY")
+    if not api_key:
+        return False, "No email API key configured"
+
+    resend.api_key = api_key
+
+    from_email = os.getenv(
+        "RESEND_FROM_EMAIL",
+        "BORA Reports <reports@bora-analysis.co.za>"
+    )
+
+    try:
+        pdf_base64 = base64.b64encode(
+            pdf_bytes).decode()
+
+        params = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": f"Your BORA {doc_type} Report",
+            "html": """
+            <div style='font-family: Arial, sans-serif;
+                        max-width: 600px; margin: 0 auto;'>
+                <div style='background: #1B2A4A;
+                            padding: 24px;
+                            text-align: center;'>
+                    <h1 style='color: #C9A84C;
+                               margin: 0;'>BORA</h1>
+                    <p style='color: white; margin: 8px 0 0;'>
+                        Legal Document Analysis
+                    </p>
+                </div>
+                <div style='padding: 24px;
+                            background: #f9f9f9;'>
+                    <h2 style='color: #1B2A4A;'>
+                        Your Analysis Report is Ready
+                    </h2>
+                    <p style='color: #555;'>
+                        Please find your BORA risk analysis
+                        report attached to this email.
+                    </p>
+                    <p style='color: #555;'>
+                        This report identifies potential legal
+                        risks in your document and provides
+                        recommended actions for each risk found.
+                    </p>
+                    <div style='background: #FFF8E1;
+                                border-left: 4px solid #F57C00;
+                                padding: 12px 16px;
+                                margin: 16px 0;'>
+                        <strong>Important:</strong> This analysis
+                        is for informational purposes only and
+                        does not constitute legal advice.
+                        Always consult a qualified South African
+                        attorney for legal matters.
+                    </div>
+                </div>
+                <div style='background: #1B2A4A;
+                            padding: 16px;
+                            text-align: center;'>
+                    <p style='color: #C9A84C;
+                               margin: 0;
+                               font-size: 12px;'>
+                        bora-analysis.streamlit.app
+                    </p>
+                    <p style='color: white;
+                               margin: 4px 0 0;
+                               font-size: 11px;'>
+                        BORA is not a law firm and does not
+                        provide legal advice.
+                    </p>
+                </div>
+            </div>
+            """,
+            "attachments": [
+                {
+                    "filename": "BORA_Analysis_Report.pdf",
+                    "content": pdf_base64,
+                    "type": "application/pdf"
+                }
+            ]
+        }
+
+        response = resend.Emails.send(params)
+
+        if response and hasattr(response, 'id'):
+            return True, "Email sent successfully"
+        else:
+            return False, "Email send failed"
+
+    except Exception as e:
+        return False, str(e)

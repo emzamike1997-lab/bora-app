@@ -5,3 +5,4 @@ __pycache__/
 javas_ai.db
 *.db
 .DS_Store
+BORA_KEYS.txt 

@@ -4,7 +4,7 @@ import stripe
 from modules.database import can_analyze, consume_analysis
 from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_general_scan_prompt
-from modules.report import generate_pdf_report
+from modules.report import generate_pdf_report, send_pdf_email
 from modules.results_display import display_formatted_results
 
 def extract_risk_counts(text):
@@ -214,6 +214,27 @@ if "last_results" in st.session_state and st.session_state.last_type == "General
                     doc_type="General Document Scan",
                     analysis_depth=depth_str
                 )
+                
+                # Attempt email delivery via Resend
+                email = st.session_state.get("last_email", "")
+                if email:
+                    success, message = send_pdf_email(
+                        to_email=email,
+                        pdf_bytes=pdf_bytes,
+                        doc_type="General Document Scan"
+                    )
+                    if success:
+                        st.success(
+                            "✅ Report sent to " + email +
+                            " — Check your inbox!"
+                        )
+                    else:
+                        st.warning(
+                            "📥 Email delivery unavailable. "
+                            "Please download your report below."
+                        )
+                
+                # Always show download button
                 st.download_button(
                     label="Download PDF Report",
                     data=pdf_bytes,
