@@ -1,8 +1,4 @@
 import io
-import os
-import base64
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (Mail, Attachment, FileContent, FileName, FileType, Disposition)
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -251,36 +247,3 @@ def generate_pdf_report(results_text, doc_type="Legal Document", analysis_depth=
     doc.build(story)
     buffer.seek(0)
     return buffer.read()
-
-def send_report_email(to_email: str, pdf_bytes: bytes, document_type: str):
-    from_email = os.getenv("SENDGRID_FROM_EMAIL", "reports@bora-analysis.co.za")
-    api_key = os.getenv("SENDGRID_API_KEY")
-    if not api_key:
-        print("No SendGrid API Key found.")
-        return False
-        
-    subject = f"Your BORA {document_type} Report"
-    content = f"Please find attached your BORA {document_type} report."
-    message = Mail(
-        from_email=from_email,
-        to_emails=to_email,
-        subject=subject,
-        html_content=content
-    )
-    
-    encoded_file = base64.b64encode(pdf_bytes).decode()
-    attachedFile = Attachment(
-        FileContent(encoded_file),
-        FileName(f'BORA_{document_type.replace(" ", "_")}.pdf'),
-        FileType('application/pdf'),
-        Disposition('attachment')
-    )
-    message.attachment = attachedFile
-    
-    try:
-        sg = SendGridAPIClient(api_key)
-        sg.send(message)
-        return True
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        return False

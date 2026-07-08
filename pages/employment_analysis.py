@@ -4,10 +4,7 @@ import stripe
 from modules.database import can_analyze, consume_analysis
 from modules.analyzer import run_analysis, extract_text_from_file, get_document_stats, parse_scorecard
 from modules.prompts import get_employment_prompt
-import importlib
-import modules.report
-importlib.reload(modules.report)
-from modules.report import generate_pdf_report, send_report_email
+from modules.report import generate_pdf_report
 from modules.results_display import display_formatted_results
 
 def extract_risk_counts(text):
@@ -202,23 +199,36 @@ if "last_results" in st.session_state and st.session_state.last_type == "Employm
     st.write("---")
     st.markdown("### Download & Delivery")
     
-    if st.button("Generate & Email PDF Report"):
+    if 'depth' not in locals():
+        depth = "Standard Analysis"
+    if not depth:
+        depth = "Standard Analysis"
+
+    if st.button("Generate PDF Report"):
         with st.spinner("Generating PDF..."):
-            pdf_bytes = generate_pdf_report(
-                results,
-                doc_type="Employment Contract Analysis",
-                analysis_depth=depth
-            )
-            success = send_report_email(st.session_state.last_email, pdf_bytes, "Employment Analysis")
-            
-            if success:
-                st.success(f"Report emailed to {st.session_state.last_email}!")
-            else:
-                st.warning("Failed to email report, but you can download it below.")
-                
-            st.download_button(
-                label="Download PDF Report directly",
-                data=pdf_bytes,
-                file_name="BORA_Employment_Analysis.pdf",
-                mime="application/pdf"
-            )
+            try:
+                results_str = str(results) if results else ""
+                depth_str = str(depth) if depth else "Standard"
+                pdf_bytes = generate_pdf_report(
+                    results_str,
+                    doc_type="Employment Contract Analysis",
+                    analysis_depth=depth_str
+                )
+                st.download_button(
+                    label="Download PDF Report",
+                    data=pdf_bytes,
+                    file_name="BORA_Analysis.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(
+                    "PDF generation failed. "
+                    "Please try again."
+                )
+                # Show download of raw results as backup
+                st.download_button(
+                    label="Download Results as Text",
+                    data=str(results),
+                    file_name="BORA_Analysis.txt",
+                    mime="text/plain"
+                )
