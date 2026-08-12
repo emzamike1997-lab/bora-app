@@ -66,6 +66,23 @@ def _parse_individual_risks(section_text, emoji):
         if action_match:
             risk["action"] = action_match.group(1).strip()
         
+        # Guards to filter out invalid or placeholder risk items
+        title = risk["title"]
+        is_empty_or_punctuation = not any(c.isalnum() for c in title)
+        is_placeholder = title.startswith("(") and title.endswith(")")
+        is_missing_fields = not risk["clause"] and not risk["action"]
+        
+        if is_empty_or_punctuation or is_placeholder or is_missing_fields:
+            reasons = []
+            if is_empty_or_punctuation:
+                reasons.append("empty or punctuation title")
+            if is_placeholder:
+                reasons.append("category placeholder title")
+            if is_missing_fields:
+                reasons.append("missing both Clause and What to do")
+            print(f"[BORA FILTER] Skipping risk item due to {', '.join(reasons)}: {r!r}")
+            continue
+        
         risks.append(risk)
     return risks
 
