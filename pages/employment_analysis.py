@@ -7,37 +7,7 @@ from modules.prompts import get_employment_prompt
 from modules.report import generate_pdf_report, send_pdf_email
 from modules.results_display import display_formatted_results
 
-def extract_risk_counts(text):
-    """Count risks by counting emoji occurrences in text."""
-    if not text:
-        return 0, 0, 0
-    critical = text.count('🔴')
-    moderate = text.count('🟡')  
-    low = text.count('🟢')
-    return critical, moderate, low
 
-def detect_overall_rating(text):
-    """Detect rating from text."""
-    if not text:
-        return "RED"
-    text_upper = text.upper()
-    if "DO NOT SIGN" in text_upper:
-        return "RED"
-    if "NEGOTIATE FIRST" in text_upper:
-        return "AMBER"  
-    if "REASONABLE TO SIGN" in text_upper:
-        return "GREEN"
-    if "HIGH RISK" in text_upper:
-        return "RED"
-    if "MODERATE RISK" in text_upper:
-        return "AMBER"
-    if "LOW RISK" in text_upper:
-        return "GREEN"
-    if text.count('🔴') > 0:
-        return "RED"
-    if text.count('🟡') > 0:
-        return "AMBER"
-    return "GREEN"
 
 st.set_page_config(page_title="Employment Analysis - BORA", layout="centered", initial_sidebar_state="collapsed")
 
@@ -170,10 +140,17 @@ if "last_results" in st.session_state and st.session_state.last_type == "Employm
     elif any(err in results for err in ["Chunk processing failed:", "Rate limit exceeded", "Request too large"]):
         st.warning("⚡ Processing large document in sections. Results may be partial. Try Quick Scan for faster results.")
     
-    # Always show scorecard and results
-    critical_count, moderate_count, low_count = extract_risk_counts(results)
-    overall_rating = detect_overall_rating(results)
-    
+    # 4. Formatted results display — counts come from the real parsed card lists
+    critical_count, moderate_count, low_count = display_formatted_results(results)
+
+    # Overall rating derived from actual parsed counts
+    if critical_count > 0:
+        overall_rating = "RED"
+    elif moderate_count > 0:
+        overall_rating = "AMBER"
+    else:
+        overall_rating = "GREEN"
+
     # 1. Coloured summary box
     if overall_rating == "RED":
         st.error("🔴 HIGH RISK DOCUMENT — Do not sign without legal review and negotiation.")
@@ -181,20 +158,17 @@ if "last_results" in st.session_state and st.session_state.last_type == "Employm
         st.warning("🟡 MODERATE RISK DOCUMENT — Review flagged clauses before signing.")
     else:
         st.success("🟢 LOW RISK DOCUMENT — This document appears reasonable. Standard legal review recommended.")
-        
+
     # 2. Metric row with 3 columns
     col_m1, col_m2, col_m3 = st.columns(3)
     col_m1.metric("🔴 Critical Risks", critical_count)
     col_m2.metric("🟡 Moderate Risks", moderate_count)
     col_m3.metric("🟢 Low Risks", low_count)
-    
+
     # 3. Recommended Action badge
     recommended_action = "⛔ Do Not Sign Yet" if overall_rating == "RED" else ("⚠️ Negotiate First" if overall_rating == "AMBER" else "✅ Reasonable to Sign")
     st.markdown(f"**Recommended Action:** `{recommended_action}`")
     st.write("---")
-    
-    # 4. Formatted results display
-    display_formatted_results(results)
             
     st.write("---")
     st.markdown("### Download & Delivery")
