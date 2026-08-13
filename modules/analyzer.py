@@ -169,7 +169,7 @@ def run_analysis(text, prompt, depth="Standard Analysis", document_type="General
                         "---\n\n"
                         "🔴 RISK [NUMBER]: [RISK TITLE IN CAPS]\n"
                         "Clause: [exact location]\n"
-                        "Law violated: [specific act and section]\n"
+                        "Law violated: [specific act and section. If the risk violates a common-law principle rather than a specific statute (e.g. right to due process before eviction, unlawful self-help, access to courts/natural justice, unconscionable penalties under common law), name that principle explicitly, e.g. 'Common law: unlawful self-help / illegal eviction' or 'Common law: ouster of court jurisdiction (void as against public policy)'. Only use 'None' if the risk is purely a fairness/best-practice concern with no legal basis at all, and even then prefer 'General fairness concern' over 'None']\n"
                         "What it means in plain English: [one sentence a non-lawyer understands]\n"
                         "Financial impact: [estimated rand amount if possible, or \"significant\" if not]\n"
                         "What to do: [specific negotiation instruction]\n\n"
