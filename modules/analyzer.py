@@ -176,7 +176,7 @@ def run_analysis(text, prompt, depth="Standard Analysis", document_type="General
                         "  • If the risk is purely a fairness/best-practice concern with no legal basis: write 'General fairness concern' — never 'None'.\n"
                         "  Examples: 'General fairness concern: no joint inspection procedure', 'General fairness concern: asymmetric maintenance obligations', 'Common law: unconscionable penalty clause'.]\n"
                         "What it means in plain English: [one sentence a non-lawyer understands]\n"
-                        "Financial impact: [estimated rand amount if possible, or \"significant\" if not]\n"
+                        "Financial impact: [MANDATORY — NEVER write 'None' for a critical risk. If there is no specific Rand figure, describe the practical or financial consequence in words instead. Examples: 'Tenant loses interest income on deposit for full lease term', 'Tenant locked into 12 additional months of rent, worth R150,000', 'Significant: Tenant loses right to dispute utility bills or claim maintenance refunds'.]\n"
                         "What to do: [specific negotiation instruction]\n\n"
                         "---\n"
                         "MODERATE RISKS\n"

@@ -6,19 +6,37 @@ import re
 import streamlit as st
 
 
+def _safe_log(msg):
+    """Prints a message to console safely, avoiding UnicodeEncodeErrors on Windows terminal."""
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(msg.encode('ascii', errors='replace').decode('ascii'))
+        except Exception:
+            pass
+
+
+
 def _extract_section(text, start_marker, end_markers):
-    """Extract text between start_marker and the first end_marker found."""
-    pattern = re.escape(start_marker)
-    match = re.search(pattern, text, re.IGNORECASE)
+    """Extract text between start_marker and the first end_marker found, matching them only as standalone lines."""
+    start_pattern = rf"(?mi)^\s*{re.escape(start_marker)}\s*$"
+    match = re.search(start_pattern, text)
     if not match:
-        return ""
+        # Fallback to standard substring search if not found as a standalone line
+        pattern = re.escape(start_marker)
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            return ""
     remaining = text[match.end():]
     # Strip leading dashes/whitespace
     remaining = re.sub(r"^\s*-{2,}\s*", "", remaining)
 
     earliest = len(remaining)
     for em in end_markers:
-        m = re.search(re.escape(em), remaining, re.IGNORECASE)
+        # Match the end marker only when it appears on its own line (possibly with dashes/asterisks)
+        end_pattern = rf"(?mi)^\s*(?:-{{2,}}\s*)?{re.escape(em)}\s*(?:\s*-{{2,}})?$"
+        m = re.search(end_pattern, remaining)
         if m and m.start() < earliest:
             earliest = m.start()
     return remaining[:earliest].strip()
@@ -37,7 +55,7 @@ def _parse_individual_risks(section_text):
     if not section_text.strip():
         return []
 
-    print(f"[BORA PARSE] Raw section text ({len(section_text)} chars):\n{section_text[:600]}\n---")
+    _safe_log(f"[BORA PARSE] Raw section text ({len(section_text)} chars):\n{section_text[:600]}\n---")
 
     # Split on numbered headings at the start of a line e.g. "1. **TITLE**" or "1. TITLE"
     parts = re.split(r"(?m)(?=^\d+\.\s+\*{0,2}\S)", section_text)
@@ -126,7 +144,7 @@ def _parse_individual_risks(section_text):
                 reasons.append("category placeholder title")
             if is_missing_fields:
                 reasons.append("missing both Clause and What to do")
-            print(f"[BORA FILTER] Skipping risk item due to {', '.join(reasons)}: {r!r}")
+            _safe_log(f"[BORA FILTER] Skipping risk item due to {', '.join(reasons)}: {r!r}")
             continue
 
         risks.append(risk)
@@ -198,14 +216,14 @@ def _deduplicate_risks(critical, moderate, low, threshold=0.70):
                 score_j = severity_rank[sj] * 10 + _risk_completeness(rj)
                 if score_j > score_i:
                     keep[i] = False
-                    print(f"[BORA DEDUP] Dropping {si} risk '{ri.get('title','')}' "
-                          f"(sim={sim:.2f}) in favour of {sj} '{rj.get('title','')}' "
-                          f"(score {score_j} vs {score_i})")
+                    _safe_log(f"[BORA DEDUP] Dropping {si} risk '{ri.get('title','')}' "
+                              f"(sim={sim:.2f}) in favour of {sj} '{rj.get('title','')}' "
+                              f"(score {score_j} vs {score_i})")
                 else:
                     keep[j] = False
-                    print(f"[BORA DEDUP] Dropping {sj} risk '{rj.get('title','')}' "
-                          f"(sim={sim:.2f}) in favour of {si} '{ri.get('title','')}' "
-                          f"(score {score_i} vs {score_j})")
+                    _safe_log(f"[BORA DEDUP] Dropping {sj} risk '{rj.get('title','')}' "
+                              f"(sim={sim:.2f}) in favour of {si} '{ri.get('title','')}' "
+                              f"(score {score_i} vs {score_j})")
 
     # Rebuild per-severity lists preserving order
     new_critical = [tagged[i][0] for i in range(len(tagged)) if keep[i] and tagged[i][1] == "critical"]
@@ -224,7 +242,7 @@ def display_formatted_results(results):
     page can show accurate metric counts from the SAME parsed lists used
     to render the cards — not from an independent emoji-counting pass.
     """
-    print(f"[BORA RAW RESPONSE] Full response ({len(results)} chars):\n{results[:2000]}\n---")
+    _safe_log(f"[BORA RAW RESPONSE] Full response ({len(results)} chars):\n{results[:2000]}\n---")
 
     # --- STEP 1: Extract Executive Summary ---
     exec_summary = _extract_section(results, "EXECUTIVE SUMMARY",
@@ -252,7 +270,7 @@ def display_formatted_results(results):
         critical_risks, moderate_risks, low_risks
     )
 
-    print(f"[BORA COUNTS] After dedup: critical={len(critical_risks)}, moderate={len(moderate_risks)}, low={len(low_risks)}")
+    _safe_log(f"[BORA COUNTS] After dedup: critical={len(critical_risks)}, moderate={len(moderate_risks)}, low={len(low_risks)}")
 
     # Display critical risks (expanded)
     if critical_risks:
