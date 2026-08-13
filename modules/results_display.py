@@ -133,6 +133,87 @@ def _parse_individual_risks(section_text):
     return risks
 
 
+def _clause_similarity(a, b):
+    """
+    Returns a 0-1 similarity score between two clause strings using
+    token-set overlap (Jaccard on word sets). Fast, no external deps.
+    """
+    if not a or not b:
+        return 0.0
+    # Normalise: lowercase, strip punctuation, split into word tokens
+    def tokenise(s):
+        return set(re.sub(r"[^\w\s]", "", s.lower()).split())
+    ta, tb = tokenise(a), tokenise(b)
+    if not ta or not tb:
+        return 0.0
+    return len(ta & tb) / len(ta | tb)
+
+
+def _risk_completeness(risk):
+    """Score a risk dict by how many useful fields it has filled in."""
+    score = 0
+    if risk.get("clause", ""):
+        score += 2
+    if risk.get("action", ""):
+        score += 2
+    if risk.get("financial", "") and risk["financial"].lower() not in ("none", "significant", ""):
+        score += 3  # has actual figures — prefer this one
+    if risk.get("law", "") and risk["law"].lower() not in ("none", ""):
+        score += 1
+    if risk.get("plain_english", ""):
+        score += 1
+    return score
+
+
+def _deduplicate_risks(critical, moderate, low, threshold=0.70):
+    """
+    Post-parse dedup: if any two risk items across ALL severity tiers share
+    clause text with Jaccard similarity >= threshold, keep the one with more
+    complete detail (higher _risk_completeness score) and drop the other.
+    Critical > Moderate > Low in tie-breaking so a clause always stays at
+    its highest severity.
+    """
+    # Flatten with severity tag so we can compare across sections
+    tagged = (
+        [(r, "critical") for r in critical]
+        + [(r, "moderate") for r in moderate]
+        + [(r, "low") for r in low]
+    )
+
+    severity_rank = {"critical": 3, "moderate": 2, "low": 1}
+    keep = [True] * len(tagged)
+
+    for i in range(len(tagged)):
+        if not keep[i]:
+            continue
+        for j in range(i + 1, len(tagged)):
+            if not keep[j]:
+                continue
+            ri, si = tagged[i]
+            rj, sj = tagged[j]
+            sim = _clause_similarity(ri.get("clause", ""), rj.get("clause", ""))
+            if sim >= threshold:
+                # Prefer higher severity; break ties by completeness
+                score_i = severity_rank[si] * 10 + _risk_completeness(ri)
+                score_j = severity_rank[sj] * 10 + _risk_completeness(rj)
+                if score_j > score_i:
+                    keep[i] = False
+                    print(f"[BORA DEDUP] Dropping {si} risk '{ri.get('title','')}' "
+                          f"(sim={sim:.2f}) in favour of {sj} '{rj.get('title','')}' "
+                          f"(score {score_j} vs {score_i})")
+                else:
+                    keep[j] = False
+                    print(f"[BORA DEDUP] Dropping {sj} risk '{rj.get('title','')}' "
+                          f"(sim={sim:.2f}) in favour of {si} '{ri.get('title','')}' "
+                          f"(score {score_i} vs {score_j})")
+
+    # Rebuild per-severity lists preserving order
+    new_critical = [tagged[i][0] for i in range(len(tagged)) if keep[i] and tagged[i][1] == "critical"]
+    new_moderate = [tagged[i][0] for i in range(len(tagged)) if keep[i] and tagged[i][1] == "moderate"]
+    new_low      = [tagged[i][0] for i in range(len(tagged)) if keep[i] and tagged[i][1] == "low"]
+    return new_critical, new_moderate, new_low
+
+
 def display_formatted_results(results):
     """
     Parse the raw analysis results text and display them using
@@ -165,7 +246,13 @@ def display_formatted_results(results):
     moderate_risks = _parse_individual_risks(moderate_text)
     low_risks = _parse_individual_risks(low_text)
 
-    print(f"[BORA COUNTS] Parsed: critical={len(critical_risks)}, moderate={len(moderate_risks)}, low={len(low_risks)}")
+    # Post-parse dedup: drop the less-complete duplicate when two items share
+    # highly similar clause text across severity tiers
+    critical_risks, moderate_risks, low_risks = _deduplicate_risks(
+        critical_risks, moderate_risks, low_risks
+    )
+
+    print(f"[BORA COUNTS] After dedup: critical={len(critical_risks)}, moderate={len(moderate_risks)}, low={len(low_risks)}")
 
     # Display critical risks (expanded)
     if critical_risks:
