@@ -170,7 +170,7 @@ def run_analysis(text, prompt, depth="Standard Analysis", document_type="General
                         "CRITICAL RISKS\n"
                         "---\n\n"
                         "🔴 RISK [NUMBER]: [RISK TITLE IN CAPS]\n"
-                        "Clause: [exact location]\n"
+                        "Clause: [exact quote or accurate paraphrase of the actual clause text from the document. NEVER write 'None'. If no real clause in the document supports this risk, do not create this risk item at all.]\n"
                         "Law violated: [specific act and section. If the risk violates a common-law principle rather than a specific statute (e.g. right to due process before eviction, unlawful self-help, access to courts/natural justice, unconscionable penalties under common law), name that principle explicitly, e.g. 'Common law: unlawful self-help / illegal eviction' or 'Common law: ouster of court jurisdiction (void as against public policy)'. Only use 'None' if the risk is purely a fairness/best-practice concern with no legal basis at all, and even then prefer 'General fairness concern' over 'None']\n"
                         "What it means in plain English: [one sentence a non-lawyer understands]\n"
                         "Financial impact: [estimated rand amount if possible, or \"significant\" if not]\n"
@@ -179,7 +179,7 @@ def run_analysis(text, prompt, depth="Standard Analysis", document_type="General
                         "MODERATE RISKS\n"
                         "---\n\n"
                         "🟡 RISK [NUMBER]: [RISK TITLE IN CAPS]\n"
-                        "Clause: [exact location]\n"
+                        "Clause: [exact quote or accurate paraphrase of the actual clause text from the document. NEVER write 'None'. If no real clause in the document supports this risk, do not create this risk item at all.]\n"
                         "Concern: [what is problematic]\n"
                         "What to do: [specific instruction]\n\n"
                         "---\n"
@@ -213,6 +213,8 @@ def run_analysis(text, prompt, depth="Standard Analysis", document_type="General
                         "3. SECTION HEADINGS: Each section heading must appear exactly once.\n"
                         "4. LISTS: Deduplicate bullet items.\n"
                         "5. NUMBERING: Re-number all risk items sequentially (e.g., 1, 2, 3, etc.).\n"
+                        "6. CLAUSE GROUNDING: Every risk item MUST be grounded in actual text from the document. The 'Clause' field must be a direct quote or an accurate paraphrase of something the document actually says. If a topic (e.g. maintenance, IP, working hours) is not addressed anywhere in the document, do NOT invent a risk item for it. Omit the risk entirely.\n"
+                        "7. NO DUPLICATE CLAUSES: Each distinct clause in the document must appear in exactly ONE risk item at its correct severity. Do not create multiple separate risk entries for the same underlying clause. If the same clause could be classified at different severities, use the highest applicable severity and list it once only.\n"
                         "The output must read as ONE single professional report. A reader must never see the same heading twice."
                     )
                 },
